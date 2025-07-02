@@ -115,3 +115,60 @@ rule PDF_NamedActions_Print_SaveAs_Close : PDF
         and any of ($attrib*)
         and any of ($named_action*)
 }
+
+rule detect_javascript {
+    meta:
+        author = "Johan"
+        date = "2025-06-24"
+        description = "Detects JavaScript patterns with a higher confidence threshold to reduce false positives. Looks for combinations of keywords, objects, and suspicious functions."
+
+    strings:
+        // --- Group 1: High-confidence indicators (often found in HTML/SVG) ---
+        $hc_script_tag = /<script\b/is
+        $hc_event_handler = /on(load|click|error|mouseover|submit|focus|pageshow)\s*=/is
+        $hc_js_uri = "javascript:" nocase
+
+        // --- Group 2: Core JS Keywords ---
+        $kw_function = /\bfunction\b/
+        $kw_var = /\bvar\b/
+        $kw_let = /\blet\b/
+        $kw_const = /\bconst\b/
+        $kw_return = /\breturn\b/
+        $kw_if = /\bif\s*\(/
+        $kw_else = /\belse\b/
+
+        // --- Group 3: Common JS Objects and Methods ---
+        $obj_document = /\.document/  // Preceded by a dot to reduce FPs
+        $obj_window = /\.window/
+        $obj_element = /createElement\s*\(/
+        $obj_addevent = /addEventListener\s*\(/
+
+        // --- Group 4: Suspicious/Obfuscation-related Functions ---
+        $susp_eval = /\beval\s*\(/
+        $susp_unescape = /\bunescape\s*\(/
+        $susp_atob = /\batob\s*\(/
+        $susp_fromcharcode = /String\.fromCharCode/
+
+    condition:
+        // Exclude common non-script file types by checking magic numbers at the beginning of the file
+        uint32(0) != 0x474E5089 and // PNG
+        uint32(0) != 0x46464952 and // RIFF (AVI, WAV)
+        uint32(0) != 0x67696638 and // GIF
+        uint32(0) != 0x4D5A9000 and // PE file
+        (
+            // --- C1: Strong indicators of embedded scripts ---
+            any of ($hc*) or
+
+            // --- C2: Likely JS file (no HTML tags) ---
+            // A combination of keywords and suspicious functions
+            (
+                (2 of ($kw*)) and (1 of ($susp*))
+            ) or
+
+            // --- C3: Another likely JS file pattern ---
+            // A critical mass of keywords and common objects
+            (
+                (4 of ($kw*)) and (1 of ($obj*))
+            )
+        )
+}
