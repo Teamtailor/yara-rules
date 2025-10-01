@@ -172,3 +172,36 @@ rule detect_javascript {
             )
         )
 }
+
+rule detect_executables
+{
+    meta:
+        description = "Detects common executable file formats (EXE, PE, ELF, Mach-O) by their magic numbers."
+        author = "Johan"
+        date = "2025-09-26"
+
+    strings:
+        // MZ header for Windows PE files (e.g., .exe, .dll)
+        $pe = { 4D 5A } // "MZ"
+
+        // ELF header for Linux/Unix executables
+        $elf = { 7F 45 4C 46 } // 0x7F 'E' 'L' 'F'
+
+        // Mach-O header for macOS/iOS 64-bit executables
+        $macho_64 = { CF FA ED FE } // big-endian
+        $macho_64_le = { FE ED FA CF } // little-endian
+
+        // Mach-O header for macOS/iOS 32-bit executables
+        $macho_32 = { CE FA ED FE } // big-endian
+        $macho_32_le = { FE ED FA CE } // little-endian
+
+    condition:
+        // Check for the magic number at the very beginning of the file (offset 0)
+        $pe at 0 or
+        $elf at 0 or
+        $macho_64 at 0 or
+        $macho_64_le at 0 or
+        $macho_32 at 0 or
+        $macho_32_le at 0
+}
+
